@@ -22,9 +22,6 @@ ReShade FX shading language
 * ``__DEVICE__`` Device id
 * ``__RENDERER__`` Renderer version
 * ``__APPLICATION__`` Hash of the application executable name
-* ``__DATE_YEAR__`` Current year
-* ``__DATE_MONTH__`` Current month
-* ``__DATE_DAY__`` Current day in month
 * ``BUFFER_WIDTH`` Backbuffer width
 * ``BUFFER_HEIGHT`` Backbuffer height
 * ``BUFFER_RCP_WIDTH`` Reciprocal backbuffer width
@@ -49,8 +46,8 @@ Semantics on textures are used to request special textures:
 Declared textures are created at runtime with the parameters specified in their definition body.
 
 ```c++
-texture texColorBuffer : COLOR; // or SV_Target
-texture texDepthBuffer : DEPTH; // or SV_Depth
+texture texColorBuffer : COLOR;
+texture texDepthBuffer : DEPTH;
 
 texture texTarget
 {
@@ -127,10 +124,11 @@ sampler samplerTarget
 
 Annotations to customize UI appearance:
 
- * ui_type - Can be `input`, `drag`, `combo` or `color`
- * ui_min - The smallest value allowed in this variable (required when `ui_type = "drag"`)
- * ui_max - The largest value allowed in this variable (required when `ui_type = "drag"`)
- * ui_items - A list of items for the combo box, each item is terminated with a `\0` character (required when `ui_type = "combo"`)
+ * ui_type - Can be `input`, `drag`, `slider`, `combo` `radio` or `color`
+ * ui_min - The smallest value allowed in this variable (required when `ui_type = "drag"` or `ui_type = "slider"`)
+ * ui_max - The largest value allowed in this variable (required when `ui_type = "drag"` or `ui_type = "slider"`)
+ * ui_step - The value added/subtracted when clicking the button next to the slider
+ * ui_items - A list of items for the combo box or radio buttons, each item is terminated with a `\0` character (required when `ui_type = "combo"` or `ui_type = "radio"`)
  * ui_label - Display name of the variable in the UI. If this is missing, the variable name is used instead.
  * ui_tooltip - Text that is displayed when the user hovers over the variable in the UI. Use this for a description.
  * ui_category - Groups values together under a common headline. Note that all variables in the same category also have to be declared next to each other for this to be displayed correctly.
@@ -153,8 +151,10 @@ Annotations are also used to request special runtime values:
  True if specified keycode (in this case the spacebar) is pressed and false otherwise.
  If mode is set to "press" the value is true only in the frame the key was initially held down.
  If mode is set to "toggle" the value stays true until the key is pressed a second time.
- * ``uniform bool buttondown < source = "mousebutton"; keycode = 0; toggle = false; >;``  
- True if specified mouse button (0 - 4) is pressed and false otherwise. If toggle is true the value stays true until the key is pressed a second time.
+ * ``uniform bool buttondown < source = "mousebutton"; keycode = 0; mode = ""; >;``  
+ True if specified mouse button (0 - 4) is pressed and false otherwise.
+ If mode is set to "press" the value is true only in the frame the key was initially held down.
+ If mode is set to "toggle" the value stays true until the key is pressed a second time.
  * ``uniform float2 mousepoint < source = "mousepoint"; >;``  
  Gets the position of the mouse cursor in screen coordinates.
  * ``uniform float2 mousedelta < source = "mousedelta"; >;``  
@@ -310,9 +310,11 @@ Annotations:
  Toggle this technique when the specified key is pressed.
  * ``technique tech3 < toggleTime = 100; > { ... }``  
  Toggle this technique at the specified time (seconds after midnight).
+ * ``technique tech4 < ui_tooltip = "My Effect description"; >``
+ Shows the specified text when the user hovers the technique in the UI.
 
 ```c++
-technique Example < enabled = true; >
+technique Example
 {
 	pass p0
 	{	
