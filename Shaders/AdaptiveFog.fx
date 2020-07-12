@@ -51,12 +51,12 @@ uniform float BloomWidth < __UNIFORM_SLIDER_FLOAT1
 	ui_tooltip = "Width of the bloom";
 > = 0.2;
 
-#include "Reshade.fxh"
+#include "ReShade.fxh"
 
 //////////////////////////////////////
 // textures
 //////////////////////////////////////
-texture   Otis_BloomTarget 	{ Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8;};	
+texture   Otis_BloomTarget < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8;};	
 
 //////////////////////////////////////
 // samplers
@@ -64,7 +64,7 @@ texture   Otis_BloomTarget 	{ Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Form
 sampler2D Otis_BloomSampler { Texture = Otis_BloomTarget; };
 
 // pixel shader which performs bloom, by CeeJay. 
-void PS_Otis_AFG_PerformBloom(float4 position : SV_Position, float2 texcoord : TEXCOORD0, out float4 fragment: SV_Target0)
+void PS_Otis_AFG_PerformBloom(float4 position : SV_Position, float2 texcoord : TEXCOORD, out float4 fragment: SV_Target0)
 {
 	float4 color = tex2D(ReShade::BackBuffer, texcoord);
 	float3 BlurColor2 = 0;
@@ -72,7 +72,7 @@ void PS_Otis_AFG_PerformBloom(float4 position : SV_Position, float2 texcoord : T
 	float MaxDistance = 8*BloomWidth;
 	float CurDistance = 0;
 	float Samplecount = 25.0;
-	float2 blurtempvalue = texcoord * ReShade::PixelSize * BloomWidth;
+	float2 blurtempvalue = texcoord * BUFFER_PIXEL_SIZE * BloomWidth;
 	float2 BloomSample = float2(2.5,-2.5);
 	float2 BloomSampleValue;
 	
