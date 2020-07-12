@@ -28,11 +28,12 @@ uniform float EdgeThresholdMin < __UNIFORM_SLIDER_FLOAT1
 	// Valid Quality Presets
 	// 10 to 15 - default medium dither (10=fastest, 15=highest quality)
 	// 20 to 29 - less dither, more expensive (20=fastest, 29=highest quality)
-	// 39       - no dither, very expensive
-	#define FXAA_QUALITY__PRESET 15
+	// 37 to 39 - no dither, very expensive (37=fastest, 39=highest quality)
+	#define FXAA_QUALITY__PRESET 29
 #endif
 
 #ifndef FXAA_GREEN_AS_LUMA
+	// Speed hack, disables the luma rendering pass
 	#define FXAA_GREEN_AS_LUMA 0
 #endif
 
@@ -77,7 +78,7 @@ sampler FXAATexture
 #if !FXAA_GREEN_AS_LUMA
 float4 FXAALumaPass(float4 vpos : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
 {
-	float4 color = tex2D(ReShade::BackBuffer, texcoord.xy);
+	float4 color = tex2D(ReShade::BackBuffer, texcoord);
 	color.a = sqrt(dot(color.rgb * color.rgb, float3(0.299, 0.587, 0.114)));
 	return color;
 }
@@ -107,7 +108,7 @@ float4 FXAAPixelShader(float4 vpos : SV_Position, float2 texcoord : TEXCOORD) : 
 
 // Rendering passes
 
-technique FXAA
+technique FXAA < ui_tooltip = "Fast approximate anti-aliasing"; >
 {
 #if !FXAA_GREEN_AS_LUMA
 	pass

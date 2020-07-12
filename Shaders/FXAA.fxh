@@ -2,7 +2,7 @@
 
 
                     NVIDIA FXAA 3.11 by TIMOTHY LOTTES
-
+                             MODIFIED VERSION
 
 ------------------------------------------------------------------------------
 COPYRIGHT (C) 2010, 2011 NVIDIA CORPORATION. ALL RIGHTS RESERVED.
@@ -387,7 +387,7 @@ NOTE the other tuning knobs are now in the shader function inputs!
     // -----------------------------------------------------------------------
     // 10 to 15 - default medium dither (10=fastest, 15=highest quality)
     // 20 to 29 - less dither, more expensive (20=fastest, 29=highest quality)
-    // 39       - no dither, very expensive 
+    // 37 to 39 - no dither, very expensive (37=fastest, 39=highest quality)
     //
     // NOTES
     // -----------------------------------------------------------------------
@@ -588,7 +588,7 @@ NOTE the other tuning knobs are now in the shader function inputs!
 /*============================================================================
                      FXAA QUALITY - EXTREME QUALITY
 ============================================================================*/
-#if (FXAA_QUALITY__PRESET == 39)
+#if (FXAA_QUALITY__PRESET == 37)
     #define FXAA_QUALITY__PS 12
     #define FXAA_QUALITY__P0 1.0
     #define FXAA_QUALITY__P1 1.0
@@ -602,6 +602,47 @@ NOTE the other tuning knobs are now in the shader function inputs!
     #define FXAA_QUALITY__P9 2.0
     #define FXAA_QUALITY__P10 4.0
     #define FXAA_QUALITY__P11 8.0
+#endif
+/*--------------------------------------------------------------------------*/
+#if (FXAA_QUALITY__PRESET == 38)
+    #define FXAA_QUALITY__PS 14
+    #define FXAA_QUALITY__P0 1.0
+    #define FXAA_QUALITY__P1 1.0
+    #define FXAA_QUALITY__P2 1.0
+    #define FXAA_QUALITY__P3 1.0
+    #define FXAA_QUALITY__P4 1.0
+    #define FXAA_QUALITY__P5 1.5
+    #define FXAA_QUALITY__P6 2.0
+    #define FXAA_QUALITY__P7 2.0
+    #define FXAA_QUALITY__P8 2.0
+    #define FXAA_QUALITY__P9 2.0
+    #define FXAA_QUALITY__P10 2.0
+    #define FXAA_QUALITY__P11 2.0
+    #define FXAA_QUALITY__P12 3.0
+    #define FXAA_QUALITY__P13 4.0
+    #define FXAA_QUALITY__P14 8.0
+#endif
+/*--------------------------------------------------------------------------*/
+#if (FXAA_QUALITY__PRESET == 39)
+    #define FXAA_QUALITY__PS 16
+    #define FXAA_QUALITY__P0 1.0
+    #define FXAA_QUALITY__P1 1.0
+    #define FXAA_QUALITY__P2 1.0
+    #define FXAA_QUALITY__P3 1.0
+    #define FXAA_QUALITY__P4 1.0
+    #define FXAA_QUALITY__P5 1.5
+    #define FXAA_QUALITY__P6 2.0
+    #define FXAA_QUALITY__P7 2.0
+    #define FXAA_QUALITY__P8 2.0
+    #define FXAA_QUALITY__P9 2.0
+    #define FXAA_QUALITY__P10 2.0
+    #define FXAA_QUALITY__P11 2.0
+    #define FXAA_QUALITY__P12 2.0
+    #define FXAA_QUALITY__P13 2.0
+    #define FXAA_QUALITY__P14 2.0
+    #define FXAA_QUALITY__P15 3.0
+    #define FXAA_QUALITY__P16 4.0
+    #define FXAA_QUALITY__P17 8.0
 #endif
 
 
@@ -1176,6 +1217,91 @@ FxaaFloat4 FxaaPixelShader(
                         doneNP = (!doneN) || (!doneP);
                         if(!doneP) posP.x += offNP.x * FXAA_QUALITY__P12;
                         if(!doneP) posP.y += offNP.y * FXAA_QUALITY__P12;
+/*--------------------------------------------------------------------------*/
+                        #if (FXAA_QUALITY__PS > 13)
+                        if(doneNP) {
+                            if(!doneN) lumaEndN = FxaaLuma(FxaaTexTop(tex, posN.xy));
+                            if(!doneP) lumaEndP = FxaaLuma(FxaaTexTop(tex, posP.xy));
+                            if(!doneN) lumaEndN = lumaEndN - lumaNN * 0.5;
+                            if(!doneP) lumaEndP = lumaEndP - lumaNN * 0.5;
+                            doneN = abs(lumaEndN) >= gradientScaled;
+                            doneP = abs(lumaEndP) >= gradientScaled;
+                            if(!doneN) posN.x -= offNP.x * FXAA_QUALITY__P13;
+                            if(!doneN) posN.y -= offNP.y * FXAA_QUALITY__P13;
+                            doneNP = (!doneN) || (!doneP);
+                            if(!doneP) posP.x += offNP.x * FXAA_QUALITY__P13;
+                            if(!doneP) posP.y += offNP.y * FXAA_QUALITY__P13;
+/*--------------------------------------------------------------------------*/
+    #if (FXAA_QUALITY__PS > 14)
+    if(doneNP) {
+        if(!doneN) lumaEndN = FxaaLuma(FxaaTexTop(tex, posN.xy));
+        if(!doneP) lumaEndP = FxaaLuma(FxaaTexTop(tex, posP.xy));
+        if(!doneN) lumaEndN = lumaEndN - lumaNN * 0.5;
+        if(!doneP) lumaEndP = lumaEndP - lumaNN * 0.5;
+        doneN = abs(lumaEndN) >= gradientScaled;
+        doneP = abs(lumaEndP) >= gradientScaled;
+        if(!doneN) posN.x -= offNP.x * FXAA_QUALITY__P14;
+        if(!doneN) posN.y -= offNP.y * FXAA_QUALITY__P14;
+        doneNP = (!doneN) || (!doneP);
+        if(!doneP) posP.x += offNP.x * FXAA_QUALITY__P14;
+        if(!doneP) posP.y += offNP.y * FXAA_QUALITY__P14;
+/*--------------------------------------------------------------------------*/
+        #if (FXAA_QUALITY__PS > 15)
+        if(doneNP) {
+            if(!doneN) lumaEndN = FxaaLuma(FxaaTexTop(tex, posN.xy));
+            if(!doneP) lumaEndP = FxaaLuma(FxaaTexTop(tex, posP.xy));
+            if(!doneN) lumaEndN = lumaEndN - lumaNN * 0.5;
+            if(!doneP) lumaEndP = lumaEndP - lumaNN * 0.5;
+            doneN = abs(lumaEndN) >= gradientScaled;
+            doneP = abs(lumaEndP) >= gradientScaled;
+            if(!doneN) posN.x -= offNP.x * FXAA_QUALITY__P15;
+            if(!doneN) posN.y -= offNP.y * FXAA_QUALITY__P15;
+            doneNP = (!doneN) || (!doneP);
+            if(!doneP) posP.x += offNP.x * FXAA_QUALITY__P15;
+            if(!doneP) posP.y += offNP.y * FXAA_QUALITY__P15;
+/*--------------------------------------------------------------------------*/
+            #if (FXAA_QUALITY__PS > 16)
+            if(doneNP) {
+                if(!doneN) lumaEndN = FxaaLuma(FxaaTexTop(tex, posN.xy));
+                if(!doneP) lumaEndP = FxaaLuma(FxaaTexTop(tex, posP.xy));
+                if(!doneN) lumaEndN = lumaEndN - lumaNN * 0.5;
+                if(!doneP) lumaEndP = lumaEndP - lumaNN * 0.5;
+                doneN = abs(lumaEndN) >= gradientScaled;
+                doneP = abs(lumaEndP) >= gradientScaled;
+                if(!doneN) posN.x -= offNP.x * FXAA_QUALITY__P16;
+                if(!doneN) posN.y -= offNP.y * FXAA_QUALITY__P16;
+                doneNP = (!doneN) || (!doneP);
+                if(!doneP) posP.x += offNP.x * FXAA_QUALITY__P16;
+                if(!doneP) posP.y += offNP.y * FXAA_QUALITY__P16;
+/*--------------------------------------------------------------------------*/
+                #if (FXAA_QUALITY__PS > 17)
+                if(doneNP) {
+                    if(!doneN) lumaEndN = FxaaLuma(FxaaTexTop(tex, posN.xy));
+                    if(!doneP) lumaEndP = FxaaLuma(FxaaTexTop(tex, posP.xy));
+                    if(!doneN) lumaEndN = lumaEndN - lumaNN * 0.5;
+                    if(!doneP) lumaEndP = lumaEndP - lumaNN * 0.5;
+                    doneN = abs(lumaEndN) >= gradientScaled;
+                    doneP = abs(lumaEndP) >= gradientScaled;
+                    if(!doneN) posN.x -= offNP.x * FXAA_QUALITY__P17;
+                    if(!doneN) posN.y -= offNP.y * FXAA_QUALITY__P17;
+                    doneNP = (!doneN) || (!doneP);
+                    if(!doneP) posP.x += offNP.x * FXAA_QUALITY__P17;
+                    if(!doneP) posP.y += offNP.y * FXAA_QUALITY__P17;
+/*--------------------------------------------------------------------------*/
+                }
+                #endif
+/*--------------------------------------------------------------------------*/
+            }
+            #endif
+/*--------------------------------------------------------------------------*/
+        }
+        #endif
+/*--------------------------------------------------------------------------*/
+    }
+    #endif
+/*--------------------------------------------------------------------------*/
+                        }
+                        #endif
 /*--------------------------------------------------------------------------*/
                     }
                     #endif
