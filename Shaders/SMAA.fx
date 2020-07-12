@@ -286,7 +286,7 @@ float3 SMAANeighborhoodBlendingWrapPS(
 
 // Rendering passes
 
-technique SMAA
+technique SMAA < ui_tooltip = "SMAA Enhanced Subpixel Morphological Antialiasing"; >
 {
 	pass LinearizeDepthPass
 	{
