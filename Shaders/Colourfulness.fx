@@ -23,20 +23,19 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Colourfulness - version 2018-11-12
-// EXPECTS FULL RANGE GAMMA LIGHT
+// Expects full range sRGB gamma-corrected input
 
+#include "ReShade.fxh"
 #include "ReShadeUI.fxh"
 
 uniform float colourfulness < __UNIFORM_SLIDER_FLOAT1
-	ui_min = -1.0; ui_max = 2.0;
+	ui_min = -1.0; ui_max = 2.0; ui_step = 0.01;
 	ui_tooltip = "Degree of colourfulness, 0 = neutral";
-	ui_step = 0.01;
 > = 0.4;
 
 uniform float lim_luma < __UNIFORM_SLIDER_FLOAT1
-	ui_min = 0.1; ui_max = 1.0;
+	ui_min = 0.1; ui_max = 1.0; ui_step = 0.01;
 	ui_tooltip = "Lower values allows for more change near clipping";
-	ui_step = 0.01;
 > = 0.7;
 
 uniform bool enable_dither <
@@ -49,26 +48,24 @@ uniform bool col_noise <
 	ui_category = "Dither";
 > = true;
 
-uniform float backbuffer_bits <
-	ui_min = 1.0; ui_max = 32.0;
+uniform float backbuffer_bits < __UNIFORM_SLIDER_FLOAT1
+	ui_min = 1.0; ui_max = 16.0; ui_step = 0.1;
 	ui_tooltip = "Backbuffer bith depth, most likely 8 or 10 bits";
 	ui_category = "Dither";
 > = 8.0;
 
 //-------------------------------------------------------------------------------------------------
-#ifndef fast_luma
-	#define fast_luma 1 // Rapid approx of sRGB gamma, small difference in quality
+#ifndef FAST_GAMMA_CALC
+	#define FAST_GAMMA_CALC 1 // Rapid approx of sRGB gamma, small difference in quality
 #endif
 
-#ifndef temporal_dither
-	#define temporal_dither 0 // Dither changes with every frame
+#ifndef TEMPORAL_DITHER
+	#define TEMPORAL_DITHER 0 // Dither changes with every frame
 #endif
 //-------------------------------------------------------------------------------------------------
 
-#include "ReShade.fxh"
-
-#if (temporal_dither == 1)
-	uniform int rnd < source = "random"; min = 0; max = 1000; >;
+#if (TEMPORAL_DITHER == 1)
+	uniform float rnd < source = "random"; min = -1000; max = 1000; >;
 #endif
 
 // Sigmoid function, sign(v)*pow(pow(abs(v), -2) + pow(s, -2), 1.0/-2)
@@ -86,13 +83,13 @@ uniform float backbuffer_bits <
 
 float3 Colourfulness(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_Target
 {
-	#if (fast_luma == 1)
+	#if (FAST_GAMMA_CALC == 1)
 		float3 c0  = tex2D(ReShade::BackBuffer, tex).rgb;
 		float luma = sqrt(dot(saturate(c0*abs(c0)), lumacoeff));
 		c0 = saturate(c0);
 	#else // Better approx of sRGB gamma
 		float3 c0  = saturate(tex2D(ReShade::BackBuffer, tex).rgb);
-		float luma = pow(dot(pow(c0 + 0.06, 2.4), lumacoeff), 1.0/2.4) - 0.06;
+		float luma = saturate(pow(dot(pow(c0 + 0.06, 2.4), lumacoeff), 1.0/2.4) - 0.06);
 	#endif
 
 	// Calc colour saturation change
@@ -101,7 +98,7 @@ float3 Colourfulness(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_Targ
 
 	if (colourfulness > 0.0)
 	{
-		// 120% of c_diff clamped to max visible range + overshoot
+		// c_diff*fudge factor, clamped to max visible range + overshoot
 		float3 rlc_diff = clamp((c_diff*1.2) + c0, -0.0001, 1.0001) - c0;
 
 		// Calc max saturation-increase without altering RGB ratios
@@ -118,7 +115,7 @@ float3 Colourfulness(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_Targ
 	{
 		// Interleaved gradient noise by Jorge Jimenez
 		const float3 magic = float3(0.06711056, 0.00583715, 52.9829189);
-		#if (temporal_dither == 1)
+		#if (TEMPORAL_DITHER == 1)
 			float xy_magic = (vpos.x + rnd)*magic.x + (vpos.y + rnd)*magic.y;
 		#else
 			float xy_magic = vpos.x*magic.x + vpos.y*magic.y;
@@ -130,7 +127,7 @@ float3 Colourfulness(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_Targ
 	return saturate(c0 + c_diff);
 }
 
-technique Colourfulness
+technique Colourfulness < ui_tooltip = "Enhances colours without clipping chroma"; >
 {
 	pass
 	{
