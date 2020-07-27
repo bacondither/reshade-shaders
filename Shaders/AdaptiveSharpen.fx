@@ -23,15 +23,15 @@
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Adaptive sharpen - version 2018-04-14
-// EXPECTS FULL RANGE GAMMA LIGHT
+// Expects full range sRGB gamma-corrected input
 
+#include "ReShade.fxh"
 #include "ReShadeUI.fxh"
 
 uniform float curve_height < __UNIFORM_SLIDER_FLOAT1
-	ui_min = 0.01; ui_max = 2.0;
+	ui_min = 0.01; ui_max = 2.0; ui_step = 0.01;
 	ui_label = "Sharpening strength";
 	ui_tooltip = "Main control of sharpening strength";
-	ui_step = 0.01;
 > = 1.0;
 
 uniform float curveslope <
@@ -95,19 +95,28 @@ uniform float pm_p <
 > = 0.7;
 
 //-------------------------------------------------------------------------------------------------
-#ifndef fast_ops
-	#define fast_ops 1 // Faster code path, small difference in quality
+#ifndef REF_QUALITY_MODE
+	#define REF_QUALITY_MODE 0 // Slower code path, small difference in quality
 #endif
 //-------------------------------------------------------------------------------------------------
 
-#include "ReShade.fxh"
+texture AS_Pass0Tex < pooled = true; >
+{
+	Width  = BUFFER_WIDTH;
+	Height = BUFFER_HEIGHT;
+	#if (REF_QUALITY_MODE == 0)
+		Format = RG16F;
+	#else
+		Format = RG32F;
+	#endif
+};
 
-texture AS_Pass0Tex < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RG16F; };
 sampler AS_Pass0Sampler { Texture = AS_Pass0Tex; };
 
 // Helper funcs
 #define sqr(a)         ( (a)*(a) )
 #define max4(a,b,c,d)  ( max(max(a, b), max(c, d)) )
+#define lumacoeff        float3(0.2558, 0.6511, 0.0931) // Mean of Rec. 709 & 601 luma coeff
 
 // Get destination pixel values
 #define texc(x,y)      ( BUFFER_PIXEL_SIZE*float2(x, y) + tex )
@@ -118,7 +127,7 @@ sampler AS_Pass0Sampler { Texture = AS_Pass0Tex; };
 #define soft_if(a,b,c) ( saturate((a + b + c + 0.056)*rcp(abs(maxedge) + 0.03) - 0.85) )
 
 // Soft limit, modified tanh
-#if (fast_ops == 1) // Tanh approx
+#if (REF_QUALITY_MODE == 0) // Tanh approx
 	#define soft_lim(v,s)  ( saturate(abs(v/s)*(27 + sqr(v/s))/(27 + 9*sqr(v/s)))*s )
 #else
 	#define soft_lim(v,s)  ( (exp(2*min(abs(v), s*24)/s) - 1)/(exp(2*min(abs(v), s*24)/s) + 1)*s )
@@ -131,14 +140,15 @@ sampler AS_Pass0Sampler { Texture = AS_Pass0Tex; };
 #define b_diff(pix)    ( abs(blur - c[pix]) )
 
 // Fast-skip threshold, keep max possible luma error under 0.5/2^bit-depth
-#if (fast_ops == 1)
+#if (REF_QUALITY_MODE == 0)
 	// Approx of x = tanh(x/y)*y + 0.5/2^bit-depth, y = min(L_overshoot, D_overshoot)
 	#define min_overshoot  ( min(abs(L_overshoot), abs(D_overshoot)) )
 	#define fskip_th       ( 0.114*pow(min_overshoot, 0.676) + 3.20e-4 ) // 10-bits
 	//#define fskip_th       ( 0.045*pow(min_overshoot, 0.667) + 1.75e-5 ) // 14-bits
 #else
 	// x = tanh(x/y)*y + 0.5/2^bit-depth, y = 0.0001
-	#define fskip_th       ( 0.000110882 ) // 14-bits
+	#define fskip_th       ( 0.0000643723 ) // 16-bits
+	//#define fskip_th       ( 0.000110882 ) // 14-bits
 #endif
 
 // Smoothstep to linearstep approx
@@ -161,10 +171,10 @@ float2 AdaptiveSharpenP0(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_
 	                 getB( 1, 0), getB(-1, 1), getB( 0, 1), getB( 1, 1), getB( 0,-2),
 	                 getB(-2, 0), getB( 2, 0), getB( 0, 2) };
 
-	// Colour to luma, fast approx gamma, avg of rec. 709 & 601 luma coeffs
-	float luma = sqrt(dot(float3(0.2558, 0.6511, 0.0931), sqr(c[0])));
+	// Colour to luma, fast approx gamma
+	float luma = sqrt(dot(sqr(c[0]), lumacoeff));
 
-	// Blur, gauss 3x3
+	// Gauss blur 3x3
 	float3 blur = (2*(c[2]+c[4]+c[5]+c[7]) + (c[1]+c[3]+c[6]+c[8]) + 4*c[0])/16;
 
 	// Contrast compression, center = 0.5, scaled to 1/3
@@ -219,7 +229,7 @@ float3 AdaptiveSharpenP1(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_
 	          + soft_if(d[1].x,d[24].x,d[21].x)*soft_if(d[8].x,d[14].x,d[17].x)  // z dir
 	          + soft_if(d[3].x,d[23].x,d[18].x)*soft_if(d[6].x,d[20].x,d[15].x); // w dir
 
-	#if (fast_ops == 1)
+	#if (REF_QUALITY_MODE == 0)
 		float2 cs = lerp( float2(L_compr_low,  D_compr_low),
 		                  float2(L_compr_high, D_compr_high), saturate(1.091*sbe - 2.282) );
 	#else
@@ -238,7 +248,7 @@ float3 AdaptiveSharpenP1(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_
 	const float3 W2 = float3(0.86602540378, 1.0, 0.54772255751); // 0.75, 1.0, 0.3
 
 	// Transition to a concave kernel if the center edge val is above thr
-	#if (fast_ops == 1)
+	#if (REF_QUALITY_MODE == 0)
 		float3 dW = sqr(lerp( W1, W2, saturate(2.4*d[0].x - 0.82) ));
 	#else
 		float3 dW = sqr(lerp( W1, W2, smoothstep(0.3, 0.8, d[0].x) ));
@@ -276,24 +286,24 @@ float3 AdaptiveSharpenP1(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_
 
 	[unroll] for (int pix = 0; pix < 12; ++pix)
 	{
-		#if (fast_ops == 1)
+		#if (REF_QUALITY_MODE == 0)
 			float lowthr = clamp((13.2*d[pix + 1].x - 0.221), 0.01, 1);
 
-			neg_laplace += sqr(luma[pix + 1])*(weights[pix]*lowthr);
+			neg_laplace += sqr(luma[pix + 1])*(abs(weights[pix])*lowthr);
 		#else
 			float t = saturate((d[pix + 1].x - 0.01)/0.09);
 			float lowthr = t*t*(2.97 - 1.98*t) + 0.01; // t*t*(3 - a*3 - (2 - a*2)*t) + a
 
-			neg_laplace += pow(abs(luma[pix + 1]) + 0.06, 2.4)*(weights[pix]*lowthr);
+			neg_laplace += pow(abs(luma[pix + 1]) + 0.06, 2.4)*(abs(weights[pix])*lowthr);
 		#endif
-		weightsum += weights[pix]*lowthr;
+		weightsum += abs(weights[pix])*lowthr;
 		lowthrsum += lowthr/12;
 	}
 
-	#if (fast_ops == 1)
+	#if (REF_QUALITY_MODE == 0)
 		neg_laplace = sqrt(neg_laplace/weightsum);
 	#else
-		neg_laplace = pow(abs(neg_laplace/weightsum), (1.0/2.4)) - 0.06;
+		neg_laplace = saturate(pow(neg_laplace/weightsum, (1.0/2.4)) - 0.06);
 	#endif
 
 	// Compute sharpening magnitude function
@@ -346,7 +356,7 @@ float3 AdaptiveSharpenP1(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_
 				luma[ii-1] = min(temp, luma[ii-1]);
 			}
 
-			#if (fast_ops != 1) // 3rd iteration
+			#if (REF_QUALITY_MODE != 0) // 3rd iteration
 				[unroll] for (i = 2; i < 22; i += 2)
 				{
 					temp = luma[i];
@@ -367,7 +377,7 @@ float3 AdaptiveSharpenP1(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_
 		}
 
 		// Calculate tanh scale factors
-		#if (fast_ops == 1)
+		#if (REF_QUALITY_MODE == 0)
 			float nmax = (max(luma[23], d[0].y)*2 + luma[24])/3;
 			float nmin = (min(luma[1],  d[0].y)*2 + luma[0])/3;
 
@@ -399,7 +409,7 @@ float3 AdaptiveSharpenP1(float4 vpos : SV_Position, float2 tex : TEXCOORD) : SV_
 	return saturate(res);
 }
 
-technique AdaptiveSharpen
+technique AdaptiveSharpen < ui_tooltip = "Adaptively sharpens without excessive ringing, aliasing or noise"; >
 {
 	pass AdaptiveSharpenPass1
 	{
